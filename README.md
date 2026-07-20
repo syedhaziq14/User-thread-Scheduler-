@@ -51,6 +51,8 @@ The project uses a standard `Makefile` and requires a Linux environment (or WSL)
 
 **Build & Run Tests**:
 ```bash
+cd "/mnt/e/user scheduler/User-thread-Scheduler-"
+
 make clean && make all
 
 # Phase 1-9: Original Architecture Tests
