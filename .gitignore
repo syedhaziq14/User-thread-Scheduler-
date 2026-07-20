@@ -1,0 +1,18 @@
+# Object files
+obj/
+*.o
+
+# Binaries
+tests/test_basic
+tests/test_interleave
+tests/test_scheduler
+tests/test_mutex
+tests/test_semaphore
+tests/test_preempt
+tests/test_channel
+benchmarks/benchmarks
+demos/petersons/petersons_O0
+demos/petersons/petersons_O3
+
+# Data
+results.csv
