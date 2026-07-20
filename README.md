@@ -10,6 +10,7 @@ Modern high-performance concurrent systems—such as Go's Goroutine scheduler an
 Following a major "State-of-the-Art" upgrade (Phases 10-14), `uthread` has evolved from a simple 1:N cooperative scheduler into a fully production-ready engine featuring M:N work stealing, asynchronous I/O, infinite dynamic threads, and interactive tracing.
 
 ## Architecture & Features
+*(Looking for a deep-dive? Check out the [Codebase Tour & API Reference](docs/CODEBASE_TOUR.md) for a full function-by-function explanation of the project.)*
 ```text
 +-------------------------------------------------------------+
 |                      Demo Applications                      |
