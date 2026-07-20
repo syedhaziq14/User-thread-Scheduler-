@@ -2,17 +2,30 @@
 obj/
 *.o
 
-# Binaries
-tests/test_basic
-tests/test_interleave
-tests/test_scheduler
-tests/test_mutex
-tests/test_semaphore
-tests/test_preempt
-tests/test_channel
+# trace file
+trace.json
+
+# Executables
 benchmarks/benchmarks
+benchmarks/bench_worksteal
+tests/test_async_io
+tests/test_basic
+tests/test_channel
+tests/test_guard_page
+tests/test_guard_page_overflow
+tests/test_infinite_threads
+tests/test_interleave
+tests/test_mutex
+tests/test_preempt
+tests/test_scheduler
+tests/test_semaphore
+tests/test_worksteal
+tests/*.exe
 demos/petersons/petersons_O0
 demos/petersons/petersons_O3
 
-# Data
-results.csv
+# Editor/OS files
+.vscode/
+.idea/
+.DS_Store
+*.swp

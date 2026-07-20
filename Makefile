@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -pthread -g
+CFLAGS = -Wall -Wextra -pthread -g -std=c11
 INCLUDES = -I./include
 
 SRC_DIR = src
@@ -31,13 +31,14 @@ $(OBJ_DIR):
 test: $(TEST_BINS)
 
 $(TEST_DIR)/%: $(TEST_DIR)/%.c $(OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
+	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@ -lm
 
 bench: $(BENCH_BINS)
 
 $(BENCH_DIR)/%: $(BENCH_DIR)/%.c $(OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@
+	$(CC) $(CFLAGS) $(INCLUDES) $^ -o $@ -lm
 
 clean:
 	rm -rf $(OBJ_DIR)
 	rm -f $(TEST_BINS) $(BENCH_BINS)
+	rm -f trace.json

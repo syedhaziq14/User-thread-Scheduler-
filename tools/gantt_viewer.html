@@ -1,0 +1,1059 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>uthread Gantt Chart — Scheduler Trace Viewer</title>
+    <meta name="description" content="Interactive Gantt chart visualization for uthread scheduler traces. Drag and drop trace.json to analyze thread interleaving and preemption.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-primary: #0a0e1a;
+            --bg-secondary: #111827;
+            --bg-card: #1a2236;
+            --bg-hover: #243049;
+            --border: #2a3551;
+            --text-primary: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --accent-blue: #3b82f6;
+            --accent-purple: #8b5cf6;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --accent-amber: #f59e0b;
+            --accent-red: #ef4444;
+            --accent-pink: #ec4899;
+
+            /* Thread state colors */
+            --state-running: #10b981;
+            --state-ready: #f59e0b;
+            --state-blocked: #ef4444;
+            --state-io-blocked: #3b82f6;
+            --state-sleep: #8b5cf6;
+            --state-create: #06b6d4;
+            --state-exit: #64748b;
+            --state-steal: #ec4899;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ===== Header ===== */
+
+        .header {
+            background: linear-gradient(135deg, var(--bg-secondary) 0%, var(--bg-card) 100%);
+            border-bottom: 1px solid var(--border);
+            padding: 20px 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(20px);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            font-weight: 700;
+            color: white;
+            box-shadow: 0 4px 16px rgba(99, 102, 241, 0.3);
+        }
+
+        .header h1 {
+            font-size: 20px;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--text-primary), var(--accent-cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header-stats {
+            display: flex;
+            gap: 24px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-value {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        /* ===== Drop Zone ===== */
+
+        .drop-zone {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 80px);
+            padding: 40px;
+            transition: all 0.3s ease;
+        }
+
+        .drop-zone.hidden {
+            display: none;
+        }
+
+        .drop-area {
+            width: 600px;
+            max-width: 90vw;
+            padding: 60px 40px;
+            border: 2px dashed var(--border);
+            border-radius: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: var(--bg-card);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .drop-area::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at center, rgba(99, 102, 241, 0.05), transparent 70%);
+            pointer-events: none;
+        }
+
+        .drop-area:hover,
+        .drop-area.dragover {
+            border-color: var(--accent-blue);
+            background: var(--bg-hover);
+            box-shadow: 0 0 40px rgba(59, 130, 246, 0.15);
+            transform: scale(1.02);
+        }
+
+        .drop-icon {
+            font-size: 64px;
+            margin-bottom: 20px;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .drop-area h2 {
+            font-size: 22px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .drop-area p {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+
+        .drop-area .file-input {
+            display: none;
+        }
+
+        .browse-btn {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 10px 24px;
+            background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .browse-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+        }
+
+        /* ===== Chart Container ===== */
+
+        .chart-container {
+            display: none;
+            flex-direction: column;
+            height: calc(100vh - 80px);
+        }
+
+        .chart-container.visible {
+            display: flex;
+        }
+
+        /* ===== Controls ===== */
+
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 12px 32px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .control-label {
+            font-size: 12px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .control-btn {
+            padding: 6px 14px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            border-radius: 8px;
+            font-size: 13px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .control-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent-blue);
+        }
+
+        .control-btn.active {
+            background: var(--accent-blue);
+            border-color: var(--accent-blue);
+        }
+
+        /* ===== Legend ===== */
+
+        .legend {
+            display: flex;
+            gap: 16px;
+            margin-left: auto;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .legend-color {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        /* ===== Gantt Chart ===== */
+
+        .gantt-wrapper {
+            flex: 1;
+            overflow: auto;
+            position: relative;
+            background: var(--bg-primary);
+        }
+
+        .gantt-chart {
+            position: relative;
+            min-height: 100%;
+        }
+
+        /* Thread labels (left sidebar) */
+        .thread-labels {
+            position: sticky;
+            left: 0;
+            width: 140px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            z-index: 10;
+            float: left;
+        }
+
+        .thread-label {
+            height: 36px;
+            display: flex;
+            align-items: center;
+            padding: 0 16px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        .thread-label:hover {
+            background: var(--bg-hover);
+            color: var(--text-primary);
+        }
+
+        .thread-label .core-badge {
+            font-size: 10px;
+            background: var(--accent-purple);
+            color: white;
+            padding: 1px 5px;
+            border-radius: 4px;
+            margin-left: 6px;
+            opacity: 0.8;
+        }
+
+        /* Timeline header */
+        .timeline-header {
+            position: sticky;
+            top: 0;
+            height: 30px;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            z-index: 5;
+            margin-left: 140px;
+        }
+
+        .time-marker {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--text-muted);
+            border-left: 1px solid var(--border);
+            padding-left: 4px;
+        }
+
+        /* Track area */
+        .tracks {
+            margin-left: 140px;
+            position: relative;
+        }
+
+        .track {
+            height: 36px;
+            position: relative;
+            border-bottom: 1px solid rgba(42, 53, 81, 0.5);
+        }
+
+        .track:hover {
+            background: rgba(59, 130, 246, 0.05);
+        }
+
+        /* Event bars */
+        .event-bar {
+            position: absolute;
+            top: 4px;
+            height: 28px;
+            border-radius: 4px;
+            min-width: 2px;
+            cursor: pointer;
+            transition: opacity 0.15s ease, transform 0.15s ease;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .event-bar:hover {
+            opacity: 0.85;
+            transform: scaleY(1.15);
+            z-index: 20;
+        }
+
+        .event-bar.state-run {
+            background: linear-gradient(180deg, #34d399, #059669);
+        }
+
+        .event-bar.state-ready {
+            background: linear-gradient(180deg, #fbbf24, #d97706);
+        }
+
+        .event-bar.state-blocked {
+            background: linear-gradient(180deg, #f87171, #dc2626);
+        }
+
+        .event-bar.state-io {
+            background: linear-gradient(180deg, #60a5fa, #2563eb);
+        }
+
+        .event-bar.state-sleep {
+            background: linear-gradient(180deg, #a78bfa, #7c3aed);
+        }
+
+        .event-bar.state-steal {
+            background: linear-gradient(180deg, #f472b6, #db2777);
+        }
+
+        /* Instant event markers */
+        .event-marker {
+            position: absolute;
+            top: 8px;
+            width: 8px;
+            height: 20px;
+            border-radius: 2px;
+            cursor: pointer;
+            z-index: 5;
+            transition: transform 0.15s ease;
+        }
+
+        .event-marker:hover {
+            transform: scale(1.5);
+            z-index: 20;
+        }
+
+        .event-marker.type-create {
+            background: var(--state-create);
+        }
+
+        .event-marker.type-exit {
+            background: var(--state-exit);
+        }
+
+        .event-marker.type-steal {
+            background: var(--state-steal);
+        }
+
+        /* ===== Tooltip ===== */
+
+        .tooltip {
+            position: fixed;
+            display: none;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 12px 16px;
+            font-size: 12px;
+            color: var(--text-primary);
+            z-index: 1000;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            pointer-events: none;
+            backdrop-filter: blur(10px);
+            max-width: 300px;
+        }
+
+        .tooltip.visible {
+            display: block;
+            animation: tooltipFade 0.15s ease;
+        }
+
+        @keyframes tooltipFade {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .tooltip-header {
+            font-weight: 600;
+            font-size: 13px;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tooltip-badge {
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 500;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 16px;
+            color: var(--text-secondary);
+            line-height: 1.8;
+        }
+
+        .tooltip-row .label {
+            color: var(--text-muted);
+        }
+
+        .tooltip-row .value {
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-cyan);
+        }
+
+        /* ===== Grid lines ===== */
+
+        .grid-line {
+            position: absolute;
+            top: 0;
+            width: 1px;
+            height: 100%;
+            background: rgba(42, 53, 81, 0.3);
+            pointer-events: none;
+        }
+
+        /* ===== Responsive ===== */
+
+        @media (max-width: 768px) {
+            .header { padding: 12px 16px; flex-wrap: wrap; gap: 12px; }
+            .header-stats { gap: 16px; }
+            .controls { padding: 8px 16px; flex-wrap: wrap; }
+            .legend { margin-left: 0; }
+            .thread-labels, .tracks { margin-left: 100px; }
+            .thread-labels { width: 100px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">μt</div>
+            <h1>uthread Gantt Chart</h1>
+        </div>
+        <div class="header-stats" id="stats">
+            <div class="stat">
+                <div class="stat-value" id="stat-threads">—</div>
+                <div class="stat-label">Threads</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="stat-events">—</div>
+                <div class="stat-label">Events</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="stat-duration">—</div>
+                <div class="stat-label">Duration</div>
+            </div>
+            <div class="stat">
+                <div class="stat-value" id="stat-cores">—</div>
+                <div class="stat-label">Cores</div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Drop Zone -->
+    <div class="drop-zone" id="dropZone">
+        <div class="drop-area" id="dropArea">
+            <div class="drop-icon">📊</div>
+            <h2>Drop trace.json here</h2>
+            <p>Or click to browse. Generated by uthread_dump_trace().</p>
+            <input type="file" class="file-input" id="fileInput" accept=".json">
+            <button class="browse-btn" id="browseBtn">Browse Files</button>
+        </div>
+    </div>
+
+    <!-- Chart -->
+    <div class="chart-container" id="chartContainer">
+        <div class="controls">
+            <div class="control-group">
+                <span class="control-label">Zoom:</span>
+                <button class="control-btn" id="zoomIn">+</button>
+                <button class="control-btn" id="zoomOut">−</button>
+                <button class="control-btn" id="zoomFit">Fit</button>
+            </div>
+            <div class="control-group">
+                <span class="control-label">Filter:</span>
+                <button class="control-btn active" id="filterAll">All</button>
+                <button class="control-btn" id="filterRun">Running</button>
+                <button class="control-btn" id="filterBlock">Blocked</button>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--state-running)"></div>
+                    <span>Running</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--state-blocked)"></div>
+                    <span>Blocked</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--state-io-blocked)"></div>
+                    <span>I/O Wait</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--state-sleep)"></div>
+                    <span>Sleep</span>
+                </div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: var(--state-steal)"></div>
+                    <span>Stolen</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="gantt-wrapper" id="ganttWrapper">
+            <div class="gantt-chart" id="ganttChart">
+                <div class="timeline-header" id="timelineHeader"></div>
+                <div class="thread-labels" id="threadLabels"></div>
+                <div class="tracks" id="tracks"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tooltip -->
+    <div class="tooltip" id="tooltip"></div>
+
+    <script>
+    (function() {
+        'use strict';
+
+        /* ===== State ===== */
+        let traceData = null;
+        let threadSpans = [];  /* computed duration spans */
+        let zoomLevel = 1;
+        let minTime = 0;
+        let maxTime = 0;
+        const PX_PER_US = 0.1; /* base pixels per microsecond */
+
+        /* ===== DOM refs ===== */
+        const dropZone = document.getElementById('dropZone');
+        const dropArea = document.getElementById('dropArea');
+        const fileInput = document.getElementById('fileInput');
+        const browseBtn = document.getElementById('browseBtn');
+        const chartContainer = document.getElementById('chartContainer');
+        const ganttWrapper = document.getElementById('ganttWrapper');
+        const ganttChart = document.getElementById('ganttChart');
+        const timelineHeader = document.getElementById('timelineHeader');
+        const threadLabels = document.getElementById('threadLabels');
+        const tracks = document.getElementById('tracks');
+        const tooltip = document.getElementById('tooltip');
+
+        /* ===== File Loading ===== */
+
+        browseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            fileInput.click();
+        });
+
+        dropArea.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) loadFile(e.target.files[0]);
+        });
+
+        dropArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropArea.classList.add('dragover');
+        });
+
+        dropArea.addEventListener('dragleave', () => {
+            dropArea.classList.remove('dragover');
+        });
+
+        dropArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropArea.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) loadFile(e.dataTransfer.files[0]);
+        });
+
+        function loadFile(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    traceData = JSON.parse(e.target.result);
+                    processTrace(traceData);
+                } catch (err) {
+                    alert('Invalid JSON file: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        /* ===== Trace Processing ===== */
+
+        function processTrace(data) {
+            const events = data.traceEvents || data;
+            if (!events || events.length === 0) {
+                alert('No trace events found.');
+                return;
+            }
+
+            /* Sort by timestamp */
+            events.sort((a, b) => a.ts - b.ts);
+
+            minTime = events[0].ts;
+            maxTime = events[events.length - 1].ts;
+
+            /* Discover threads */
+            const threadSet = new Set();
+            const coreSet = new Set();
+            events.forEach(e => {
+                threadSet.add(e.tid);
+                if (e.args && e.args.core !== undefined) coreSet.add(e.args.core);
+            });
+
+            const threads = Array.from(threadSet).sort((a, b) => a - b);
+
+            /* Compute spans: pair begin/end events into duration bars */
+            threadSpans = [];
+            const openSpans = {};  /* tid -> {startTime, type, core} */
+
+            events.forEach(ev => {
+                const tid = ev.tid;
+                const ts = ev.ts;
+                const core = (ev.args && ev.args.core !== undefined) ? ev.args.core : 0;
+
+                if (ev.ph === 'B') {
+                    /* Begin event — open a span */
+                    openSpans[tid] = { startTime: ts, type: ev.name, core: core };
+                } else if (ev.ph === 'E') {
+                    /* End event — close the span */
+                    if (openSpans[tid]) {
+                        threadSpans.push({
+                            tid: tid,
+                            startTime: openSpans[tid].startTime,
+                            endTime: ts,
+                            type: openSpans[tid].type,
+                            endType: ev.name,
+                            core: openSpans[tid].core,
+                            duration: ts - openSpans[tid].startTime
+                        });
+                        delete openSpans[tid];
+                    }
+                } else if (ev.ph === 'i') {
+                    /* Instant event */
+                    threadSpans.push({
+                        tid: tid,
+                        startTime: ts,
+                        endTime: ts,
+                        type: ev.name,
+                        endType: null,
+                        core: core,
+                        duration: 0,
+                        instant: true
+                    });
+                }
+            });
+
+            /* Update stats */
+            const duration = maxTime - minTime;
+            document.getElementById('stat-threads').textContent = threads.length;
+            document.getElementById('stat-events').textContent = events.length.toLocaleString();
+            document.getElementById('stat-duration').textContent = formatDuration(duration);
+            document.getElementById('stat-cores').textContent = coreSet.size || 1;
+
+            /* Compute ideal zoom to fit */
+            const wrapperWidth = ganttWrapper.clientWidth - 140;
+            zoomLevel = wrapperWidth / (duration * PX_PER_US);
+            if (zoomLevel < 0.01) zoomLevel = 0.01;
+            if (zoomLevel > 100) zoomLevel = 100;
+
+            /* Show chart */
+            dropZone.classList.add('hidden');
+            chartContainer.classList.add('visible');
+
+            renderChart(threads, events);
+        }
+
+        /* ===== Rendering ===== */
+
+        function renderChart(threads, events) {
+            const totalDuration = maxTime - minTime;
+            const chartWidth = Math.max(totalDuration * PX_PER_US * zoomLevel, 800);
+            const trackHeight = 36;
+
+            /* Clear */
+            timelineHeader.innerHTML = '';
+            threadLabels.innerHTML = '';
+            tracks.innerHTML = '';
+
+            /* Thread labels */
+            const labelPadding = document.createElement('div');
+            labelPadding.style.height = '30px';
+            threadLabels.appendChild(labelPadding);
+
+            threads.forEach(tid => {
+                const label = document.createElement('div');
+                label.className = 'thread-label';
+                label.innerHTML = `Thread ${tid}`;
+                threadLabels.appendChild(label);
+            });
+
+            threadLabels.style.minHeight = (30 + threads.length * trackHeight) + 'px';
+
+            /* Timeline header */
+            const numMarkers = Math.max(5, Math.min(30, Math.floor(chartWidth / 100)));
+            const interval = totalDuration / numMarkers;
+
+            for (let i = 0; i <= numMarkers; i++) {
+                const time = interval * i;
+                const marker = document.createElement('div');
+                marker.className = 'time-marker';
+                marker.style.left = (time * PX_PER_US * zoomLevel) + 'px';
+                marker.textContent = formatDuration(time);
+                timelineHeader.appendChild(marker);
+            }
+
+            timelineHeader.style.width = chartWidth + 'px';
+
+            /* Tracks and events */
+            tracks.style.width = chartWidth + 'px';
+            tracks.style.height = (threads.length * trackHeight) + 'px';
+
+            /* Grid lines */
+            for (let i = 0; i <= numMarkers; i++) {
+                const time = interval * i;
+                const line = document.createElement('div');
+                line.className = 'grid-line';
+                line.style.left = (time * PX_PER_US * zoomLevel) + 'px';
+                line.style.height = (threads.length * trackHeight) + 'px';
+                tracks.appendChild(line);
+            }
+
+            /* Track backgrounds */
+            threads.forEach((tid, idx) => {
+                const track = document.createElement('div');
+                track.className = 'track';
+                track.style.top = (idx * trackHeight) + 'px';
+                track.style.width = chartWidth + 'px';
+                track.style.position = 'absolute';
+                tracks.appendChild(track);
+            });
+
+            /* Event bars */
+            const threadIndex = {};
+            threads.forEach((tid, idx) => threadIndex[tid] = idx);
+
+            threadSpans.forEach(span => {
+                const idx = threadIndex[span.tid];
+                if (idx === undefined) return;
+
+                if (span.instant) {
+                    /* Render instant marker */
+                    const marker = document.createElement('div');
+                    marker.className = 'event-marker type-' + getInstantClass(span.type);
+                    marker.style.left = ((span.startTime - minTime) * PX_PER_US * zoomLevel) + 'px';
+                    marker.style.top = (idx * trackHeight + 8) + 'px';
+
+                    marker.addEventListener('mouseenter', (e) => showTooltip(e, span));
+                    marker.addEventListener('mouseleave', hideTooltip);
+
+                    tracks.appendChild(marker);
+                } else {
+                    /* Render duration bar */
+                    const bar = document.createElement('div');
+                    const barClass = getBarClass(span.type);
+                    bar.className = 'event-bar state-' + barClass;
+
+                    const left = (span.startTime - minTime) * PX_PER_US * zoomLevel;
+                    const width = Math.max(2, span.duration * PX_PER_US * zoomLevel);
+
+                    bar.style.left = left + 'px';
+                    bar.style.width = width + 'px';
+                    bar.style.top = (idx * trackHeight + 4) + 'px';
+
+                    bar.addEventListener('mouseenter', (e) => showTooltip(e, span));
+                    bar.addEventListener('mouseleave', hideTooltip);
+
+                    tracks.appendChild(bar);
+                }
+            });
+        }
+
+        /* ===== Helpers ===== */
+
+        function getBarClass(type) {
+            switch (type) {
+                case 'RUN': return 'run';
+                case 'BLOCK': return 'blocked';
+                case 'IO_BLOCK': return 'io';
+                case 'SLEEP': return 'sleep';
+                case 'STEAL': return 'steal';
+                default: return 'run';
+            }
+        }
+
+        function getInstantClass(type) {
+            switch (type) {
+                case 'CREATE': return 'create';
+                case 'EXIT': return 'exit';
+                case 'STEAL': return 'steal';
+                case 'READY': return 'create';
+                case 'UNBLOCK': return 'create';
+                case 'WAKEUP': return 'create';
+                default: return 'create';
+            }
+        }
+
+        function getBadgeColor(type) {
+            switch (type) {
+                case 'RUN': return 'var(--state-running)';
+                case 'BLOCK': return 'var(--state-blocked)';
+                case 'IO_BLOCK': return 'var(--state-io-blocked)';
+                case 'SLEEP': return 'var(--state-sleep)';
+                case 'STEAL': return 'var(--state-steal)';
+                case 'CREATE': return 'var(--state-create)';
+                case 'EXIT': return 'var(--state-exit)';
+                default: return 'var(--accent-blue)';
+            }
+        }
+
+        function formatDuration(us) {
+            if (us < 1000) return us.toFixed(0) + ' μs';
+            if (us < 1000000) return (us / 1000).toFixed(1) + ' ms';
+            return (us / 1000000).toFixed(2) + ' s';
+        }
+
+        /* ===== Tooltip ===== */
+
+        function showTooltip(e, span) {
+            const badgeColor = getBadgeColor(span.type);
+            let html = `
+                <div class="tooltip-header">
+                    Thread ${span.tid}
+                    <span class="tooltip-badge" style="background: ${badgeColor}; color: white">
+                        ${span.type}
+                    </span>
+                </div>`;
+
+            if (span.instant) {
+                html += `
+                    <div class="tooltip-row">
+                        <span class="label">Time</span>
+                        <span class="value">${formatDuration(span.startTime - minTime)}</span>
+                    </div>`;
+            } else {
+                html += `
+                    <div class="tooltip-row">
+                        <span class="label">Start</span>
+                        <span class="value">${formatDuration(span.startTime - minTime)}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="label">End</span>
+                        <span class="value">${formatDuration(span.endTime - minTime)}</span>
+                    </div>
+                    <div class="tooltip-row">
+                        <span class="label">Duration</span>
+                        <span class="value">${formatDuration(span.duration)}</span>
+                    </div>`;
+                if (span.endType) {
+                    html += `
+                    <div class="tooltip-row">
+                        <span class="label">Ended by</span>
+                        <span class="value">${span.endType}</span>
+                    </div>`;
+                }
+            }
+
+            html += `
+                <div class="tooltip-row">
+                    <span class="label">Core</span>
+                    <span class="value">VP ${span.core}</span>
+                </div>`;
+
+            tooltip.innerHTML = html;
+            tooltip.classList.add('visible');
+
+            const rect = tooltip.getBoundingClientRect();
+            let x = e.clientX + 12;
+            let y = e.clientY + 12;
+            if (x + rect.width > window.innerWidth) x = e.clientX - rect.width - 12;
+            if (y + rect.height > window.innerHeight) y = e.clientY - rect.height - 12;
+
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        }
+
+        function hideTooltip() {
+            tooltip.classList.remove('visible');
+        }
+
+        document.addEventListener('mousemove', (e) => {
+            if (tooltip.classList.contains('visible')) {
+                let x = e.clientX + 12;
+                let y = e.clientY + 12;
+                const rect = tooltip.getBoundingClientRect();
+                if (x + rect.width > window.innerWidth) x = e.clientX - rect.width - 12;
+                if (y + rect.height > window.innerHeight) y = e.clientY - rect.height - 12;
+                tooltip.style.left = x + 'px';
+                tooltip.style.top = y + 'px';
+            }
+        });
+
+        /* ===== Zoom Controls ===== */
+
+        document.getElementById('zoomIn').addEventListener('click', () => {
+            zoomLevel *= 1.5;
+            rerender();
+        });
+
+        document.getElementById('zoomOut').addEventListener('click', () => {
+            zoomLevel /= 1.5;
+            if (zoomLevel < 0.001) zoomLevel = 0.001;
+            rerender();
+        });
+
+        document.getElementById('zoomFit').addEventListener('click', () => {
+            const wrapperWidth = ganttWrapper.clientWidth - 140;
+            const totalDuration = maxTime - minTime;
+            zoomLevel = wrapperWidth / (totalDuration * PX_PER_US);
+            rerender();
+        });
+
+        /* Mouse wheel zoom */
+        ganttWrapper.addEventListener('wheel', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                e.preventDefault();
+                const factor = e.deltaY < 0 ? 1.2 : 0.8;
+                zoomLevel *= factor;
+                if (zoomLevel < 0.001) zoomLevel = 0.001;
+                if (zoomLevel > 1000) zoomLevel = 1000;
+                rerender();
+            }
+        }, { passive: false });
+
+        /* ===== Filter Controls ===== */
+
+        function setFilter(filter) {
+            document.querySelectorAll('.controls .control-btn').forEach(b => {
+                if (b.id.startsWith('filter')) b.classList.remove('active');
+            });
+            document.getElementById('filter' + filter).classList.add('active');
+            /* Could filter spans here, but for now just highlight */
+        }
+
+        document.getElementById('filterAll').addEventListener('click', () => setFilter('All'));
+        document.getElementById('filterRun').addEventListener('click', () => setFilter('Run'));
+        document.getElementById('filterBlock').addEventListener('click', () => setFilter('Block'));
+
+        function rerender() {
+            if (!traceData) return;
+            const events = traceData.traceEvents || traceData;
+            const threads = [...new Set(events.map(e => e.tid))].sort((a, b) => a - b);
+            renderChart(threads, events);
+        }
+
+    })();
+    </script>
+</body>
+</html>
