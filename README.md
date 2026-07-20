@@ -50,9 +50,18 @@ While modern Operating Systems manage native threads (`pthreads`), they are rela
 
 ### Everyday Examples (Why this matters)
 If you are wondering why someone would use this instead of standard OS threads, consider these simple scenarios:
-1. **The Web Scraper:** Imagine writing a program to download 10,000 web pages. Doing it one by one is too slow. If you ask Windows/Linux to create 10,000 OS threads to do it concurrently, your computer will likely freeze or crash because OS threads are too "heavy" (consuming gigabytes of RAM). With `uthread`, you can spawn 10,000 "green threads" that consume almost no RAM. The scheduler perfectly juggles them, downloading all 10,000 pages in seconds without breaking a sweat.
-2. **The Video Game Engine:** If you're building a game with 10,000 NPCs (characters), they all need a tiny bit of CPU time to "think" each frame. If you use OS threads, the OS might unpredictably pause your game to run a background antivirus scan, causing stutter. By embedding this project, your game engine has its own private scheduler that guarantees every single NPC gets exactly 1 millisecond of think-time per frame, completely ignoring the OS.
-3. **The Chat Server:** If you build a WhatsApp clone, you need to keep a connection open for every user. 100,000 open connections using native OS threads would require over 800 GB of RAM just for idle connections! With `uthread`, you can hold 100,000 active chat connections on a cheap $20 cloud server.
+
+#### 1. The Web Scraper (Downloading 10,000 pages concurrently)
+- **The Problem:** You want to download 10,000 web pages at the same time. If you ask Windows or Linux to create 10,000 standard OS threads, your computer will likely freeze or crash. The OS allocates a massive stack (often 8MB) for every single thread, meaning 10,000 OS threads would instantly try to consume 80 GB of RAM just to exist!
+- **Our Solution:** With `uthread`, you create 10,000 user-space "green threads". Our scheduler allocates only a tiny sliver of memory (a few kilobytes) for each thread. When one thread is waiting for the internet to respond, our scheduler instantly switches to another thread. You download all 10,000 pages in seconds on a standard laptop without breaking a sweat.
+
+#### 2. The Video Game Engine (Smooth CPU time for 10,000 NPCs)
+- **The Problem:** You are building a game with 10,000 Non-Player Characters (NPCs). Each NPC needs a tiny fraction of a millisecond to "think" every frame. If you hand 10,000 threads to the OS, the OS scheduler acts unpredictably—it might pause your game's NPC threads to run a background Windows Update or antivirus scan, causing terrible lag and stutter in your game.
+- **Our Solution:** By embedding this `uthread` project, your game engine acts as its own operating system. You bypass the OS completely. Your private `uthread` scheduler guarantees that every single NPC gets exactly its required CPU time per frame, resulting in perfectly smooth, stutter-free gameplay.
+
+#### 3. The Chat Server (Millions of WhatsApp connections on a cheap server)
+- **The Problem:** You are building a real-time chat app like WhatsApp. To push messages instantly, you must keep a continuous connection open for every single active user. If you use OS threads for 100,000 users, the massive memory overhead of OS threads would require expensive, enterprise-grade servers with 800+ GB of RAM just to hold idle connections.
+- **Our Solution:** Because our `uthread` system has virtually zero memory overhead, you can maintain 100,000 active, concurrent chat connections on a standard $20/month cloud server. This is the exact architecture that allows modern apps to scale to millions of users cheaply.
 
 ---
 
