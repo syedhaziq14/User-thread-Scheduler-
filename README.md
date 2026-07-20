@@ -88,7 +88,24 @@ make bench
 
 ## Benchmark Results
 
-The new M:N Work Stealing architecture significantly improves performance on CPU-bound multi-core tasks compared to the legacy 1:N scheduler:
+### 1:N Original Benchmarks
+The following benchmarks were recorded locally, comparing the original `uthread` 1:N scheduler against native Linux `pthreads`:
+
+| System  | Benchmark                      | Time (s)     | Iterations |
+|---------|--------------------------------|--------------|------------|
+| uthread | Context Switch Latency         | 0.590766     | 100000     |
+| pthread | Context Switch Latency         | 4.582479     | 100000     |
+| uthread | Throughput (1000 threads)      | 0.014724     | 1000       |
+| pthread | Throughput (1000 threads)      | 0.240703     | 1000       |
+| uthread | Mutex Contention (8 threads)   | 0.350653     | 80000      |
+| pthread | Mutex Contention (8 threads)   | 0.004606     | 80000      |
+
+**Takeaways**:
+- `uthread` is significantly faster at context switching and high-throughput thread creation because it avoids kernel-mode traps and heavy OS resource allocation.
+- `pthread` vastly outperforms `uthread` on multi-core mutex contention because Linux pthreads utilize true parallelism and fast user-space atomics (Futexes).
+
+### M:N Work Stealing Benchmarks (Phase 14)
+The new M:N Work Stealing architecture solves the single-core limitation, significantly improving performance on CPU-bound multi-core tasks:
 
 | Configuration              | Time (s) | Speedup   |
 |----------------------------|----------|-----------|
@@ -98,7 +115,6 @@ The new M:N Work Stealing architecture significantly improves performance on CPU
 
 **Context Switch Latency**: ~1.8 microseconds (1853 ns/switch)
 
-**Key Takeaways**:
+**Takeaways**:
 - `uthread` M:N scales automatically across CPU cores, achieving a 2.2x speedup on 4 virtual processors over its single-core variant.
-- Context switching remains blisteringly fast by bypassing the kernel trap boundary.
 - The minor overhead compared to raw `pthreads` reflects the cost of user-space scheduler dispatching and work stealing heuristics, which is highly competitive for a lightweight C implementation.
