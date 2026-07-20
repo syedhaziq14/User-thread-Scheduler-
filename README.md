@@ -138,11 +138,19 @@ make bench
 ### 1:N Original Benchmarks
 The following benchmarks were recorded locally, comparing the original `uthread` 1:N scheduler against native Linux `pthreads`:
 
-| Benchmark                      | Iterations | uthread Time | pthread Time | Speedup (vs pthreads) |
-|--------------------------------|------------|--------------|--------------|-----------------------|
-| Context Switch Latency         | 100,000    | 0.590766 s   | 4.582479 s   | **7.75x Faster**      |
-| Throughput (1000 threads)      | 1,000      | 0.014724 s   | 0.240703 s   | **16.35x Faster**     |
-| Mutex Contention (8 threads)   | 80,000     | 0.350653 s   | 0.004606 s   | *76.13x Slower*       |
+| System  | Benchmark                      | Time (s)     | Iterations |
+|---------|--------------------------------|--------------|------------|
+| uthread | Context Switch Latency         | 0.590766     | 100000     |
+| pthread | Context Switch Latency         | 4.582479     | 100000     |
+| uthread | Throughput (1000 threads)      | 0.014724     | 1000       |
+| pthread | Throughput (1000 threads)      | 0.240703     | 1000       |
+| uthread | Mutex Contention (8 threads)   | 0.350653     | 80000      |
+| pthread | Mutex Contention (8 threads)   | 0.004606     | 80000      |
+
+**Speedup Summary**:
+- **Context Switch Latency**: `uthread` is **7.75x faster** than `pthreads`.
+- **Thread Throughput**: `uthread` is **16.35x faster** at spawning and running 1,000 threads.
+- **Mutex Contention**: `pthreads` is **76.13x faster** than `uthread` across multiple cores (expected, as OS futexes beat pure user-space spinlocks on contention).
 
 **Takeaways**:
 - `uthread` is significantly faster at context switching and high-throughput thread creation because it avoids kernel-mode traps and heavy OS resource allocation.
