@@ -9,8 +9,6 @@
 #define TIME_QUANTUM_MS 10
 #endif
 
-#define UTHREAD_MAX_THREADS 1024
-
 /* Forward declaration of the TCB for the scheduler function pointer */
 typedef struct tcb tcb_t;
 
@@ -21,16 +19,16 @@ typedef tcb_t* (*scheduler_fn)(void);
 
 typedef struct {
     int locked;
-    int wait_queue[UTHREAD_MAX_THREADS];
-    int wait_count;
+    tcb_t *wait_head;
+    tcb_t *wait_tail;
 } uthread_mutex_t;
 
 /* ---------- Semaphore ---------- */
 
 typedef struct {
     int count;
-    int wait_queue[UTHREAD_MAX_THREADS];
-    int wait_count;
+    tcb_t *wait_head;
+    tcb_t *wait_tail;
 } uthread_sem_t;
 
 /* ---------- Channel ---------- */
