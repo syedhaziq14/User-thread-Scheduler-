@@ -24,8 +24,17 @@ static void ut_worker(void *arg) {
 }
 
 static void wait_for_ut(void) {
-    while (__sync_fetch_and_add(&done_count, 0) < NUM_THREADS)
+    int last_printed = 0;
+    while (1) {
+        int current_done = __sync_fetch_and_add(&done_count, 0);
+        if (current_done >= NUM_THREADS) break;
+        if (current_done - last_printed >= 3000) {
+            printf("   [UTHREAD] Joined %d / %d green threads...\n", current_done, NUM_THREADS);
+            last_printed = current_done;
+        }
         uthread_yield();
+    }
+    printf("   [UTHREAD] Joined %d / %d green threads...\n", NUM_THREADS, NUM_THREADS);
 }
 
 static void* pt_worker(void *arg) {
@@ -41,6 +50,9 @@ static void run_uthread_bench(int pipe_fd) {
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (int i = 0; i < NUM_THREADS; i++) {
         uthread_create(ut_worker, NULL);
+        if ((i + 1) % 3000 == 0) {
+            printf("   [UTHREAD] Spawned %d / %d green threads...\n", i + 1, NUM_THREADS);
+        }
     }
     wait_for_ut();
     clock_gettime(CLOCK_MONOTONIC, &end);
@@ -58,9 +70,15 @@ static void run_pthread_bench(int pipe_fd) {
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (int i = 0; i < NUM_THREADS; i++) {
         pthread_create(&threads[i], NULL, pt_worker, NULL);
+        if ((i + 1) % 3000 == 0) {
+            printf("   [OS] Spawned %d / %d native threads...\n", i + 1, NUM_THREADS);
+        }
     }
     for (int i = 0; i < NUM_THREADS; i++) {
         pthread_join(threads[i], NULL);
+        if ((i + 1) % 3000 == 0) {
+            printf("   [OS] Joined %d / %d native threads...\n", i + 1, NUM_THREADS);
+        }
     }
     clock_gettime(CLOCK_MONOTONIC, &end);
 

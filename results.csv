@@ -1,0 +1,7 @@
+System,Benchmark,Time_s,Iterations
+uthread,Context Switch Latency,0.363786,100000
+pthread,Context Switch Latency,6.447705,100000
+uthread,Throughput,0.003256,1000
+pthread,Throughput,0.084235,1000
+uthread,Mutex Contention,0.402239,80000
+pthread,Mutex Contention,0.003894,80000
