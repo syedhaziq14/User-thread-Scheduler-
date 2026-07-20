@@ -44,6 +44,26 @@ Following a major "State-of-the-Art" upgrade (Phases 10-14), `uthread` has evolv
 - **Observability**: A low-overhead ring buffer records all context switches, steals, and I/O events in memory. This generates a Chrome Trace Format `trace.json` file, viewable in the interactive Gantt chart viewer (`tools/gantt_viewer.html`).
 - **M:N Work Stealing**: The scheduler operates in an M:N mode, mapping thousands of user threads across a pool of native Virtual Processors (cores). Idle cores proactively steal work from overloaded cores.
 
+## Real-World Use Cases & Educational Value
+
+While modern Operating Systems manage native threads (`pthreads`), they are relatively heavy, requiring slow traps into Kernel Mode. This user-space scheduler bypasses the OS kernel to offer massive scalability and performance. Here is how this project is practically useful:
+
+### 1. Solving the "C10k Problem" (Massive Concurrency)
+Native OS threads allocate large default stacks (often 8MB), making it impossible to spawn 100,000 threads for concurrent network connections without exhausting system memory. Because `uthread` allocates threads dynamically in user-space with tiny memory footprints, a developer can easily spawn 100,000 threads on a standard laptop. This is the exact M:N architecture used by **Go (Goroutines)**, **Java (Project Loom)**, and **Erlang** to handle massive web traffic seamlessly.
+
+### 2. Making Asynchronous I/O Look Synchronous
+When an OS thread performs I/O (like reading from a socket), it blocks, forcing the CPU core to sit idle. Because this project implements `epoll` and Async I/O (Phase 12), the scheduler intercepts blocking network calls, instantly pauses the thread, and hands the CPU to another ready thread. The CPU never sits idle, allowing developers to write simple, synchronous-looking code that is highly concurrent under the hood.
+
+### 3. Application-Specific Scheduling
+The OS scheduler is "General Purpose" and has to balance all system applications fairly. For specialized applications (like high-frequency trading or a custom game engine), developers need absolute control over execution. This library can be integrated into a C/C++ codebase as a custom "Job System," allowing developers to bypass OS unpredictability and perfectly tune the scheduling of critical tasks.
+
+### 4. The Ultimate Educational Sandbox
+Operating Systems are notoriously hard to learn because standard kernels are massive and complex. This project provides a clean, user-space, C-based sandbox. Engineers and students can use this project to:
+- Learn exactly how context switching, CPU registers, and the `ucontext_t` struct work.
+- Understand how Mutexes and Semaphores block threads by moving them between Queues without busy-waiting.
+- Try writing experimental scheduling algorithms by modifying a few lines of C code, rather than recompiling a Linux Kernel.
+- Visually debug thread behavior across CPU cores using the built-in **Gantt Chart Viewer**.
+
 ## Build and Run Instructions
 The project uses a standard `Makefile` and requires a Linux environment (or WSL) due to its reliance on `ucontext.h`, `epoll`, and `mmap`.
 

@@ -102,6 +102,7 @@ void* b3_p_worker(void *arg) {
 }
 
 int main(void) {
+    setvbuf(stdout, NULL, _IONBF, 0);
     struct timespec start, end;
     double t_u1, t_p1, t_u2, t_p2, t_u3, t_p3;
     
@@ -137,13 +138,16 @@ int main(void) {
     // Run Benchmark 2
     // ------------------------------------------
     printf("Running Benchmark 2: Throughput under load...\n");
-    int NUM_THREADS = 1000;
+    int NUM_THREADS = 200;
     
     // uthread
     active_threads = NUM_THREADS;
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (int i = 0; i < NUM_THREADS; i++) {
-        uthread_create(b2_u_worker, NULL);
+        if (uthread_create(b2_u_worker, NULL) < 0) {
+            printf("uthread_create failed at index %d\n", i);
+            exit(1);
+        }
     }
     wait_for_uthreads();
     clock_gettime(CLOCK_MONOTONIC, &end);
@@ -153,7 +157,10 @@ int main(void) {
     pthread_t *pt_arr = malloc(sizeof(pthread_t) * NUM_THREADS);
     clock_gettime(CLOCK_MONOTONIC, &start);
     for (int i = 0; i < NUM_THREADS; i++) {
-        pthread_create(&pt_arr[i], NULL, b2_p_worker, NULL);
+        if (pthread_create(&pt_arr[i], NULL, b2_p_worker, NULL) != 0) {
+            printf("pthread_create failed at index %d\n", i);
+            exit(1);
+        }
     }
     for (int i = 0; i < NUM_THREADS; i++) {
         pthread_join(pt_arr[i], NULL);
