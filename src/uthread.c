@@ -16,6 +16,7 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdint.h>
+#include <sched.h>
 
 /* =========================================================================
  * CONFIGURATION CONSTANTS
@@ -89,10 +90,16 @@ static inline void spinlock_init(spinlock_t *sl) {
 }
 
 static inline void spinlock_acquire(spinlock_t *sl) {
+    int spin_count = 0;
     while (atomic_exchange(&sl->lock, 1) != 0) {
+        if (spin_count < 100) {
 #if defined(__x86_64__) || defined(__i386__)
-        __asm__ __volatile__("pause");
+            __asm__ __volatile__("pause");
 #endif
+            spin_count++;
+        } else {
+            sched_yield(); /* Yield the underlying OS thread if spinning too long */
+        }
     }
 }
 
