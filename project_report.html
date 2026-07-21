@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UThread — User-Space Thread Scheduler | OS Semester Project Report</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        @page {
+            size: A4;
+            margin: 0;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+            background: #ffffff;
+            color: #1a1a2e;
+            width: 210mm;
+            min-height: 297mm;
+            margin: 0 auto;
+            padding: 0;
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+        }
+
+        .page {
+            width: 210mm;
+            min-height: 297mm;
+            padding: 18mm 20mm 15mm 20mm;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* ---- Decorative accent bar at top ---- */
+        .page::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 6px;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6, #a855f7, #ec4899);
+        }
+
+        /* ---- Header Section ---- */
+        .header {
+            text-align: center;
+            margin-bottom: 12px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .university-name {
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 2.5px;
+            color: #6366f1;
+            margin-bottom: 2px;
+        }
+
+        .dept-name {
+            font-size: 9px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #9ca3af;
+            margin-bottom: 10px;
+        }
+
+        .project-badge {
+            display: inline-block;
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: #fff;
+            font-size: 8px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            padding: 3px 14px;
+            border-radius: 20px;
+            margin-bottom: 10px;
+        }
+
+        .project-title {
+            font-size: 22px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #1a1a2e, #6366f1);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            line-height: 1.2;
+            margin-bottom: 4px;
+        }
+
+        .project-subtitle {
+            font-size: 10.5px;
+            font-weight: 500;
+            color: #6b7280;
+        }
+
+        /* ---- Team Section ---- */
+        .team-section {
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+            margin-bottom: 14px;
+            padding: 8px 0;
+            background: #f9fafb;
+            border-radius: 8px;
+        }
+
+        .team-member {
+            text-align: center;
+        }
+
+        .team-member .name {
+            font-size: 10px;
+            font-weight: 700;
+            color: #1a1a2e;
+        }
+
+        .team-member .roll {
+            font-size: 8.5px;
+            color: #6366f1;
+            font-weight: 600;
+        }
+
+        /* ---- Two-Column Layout ---- */
+        .content {
+            display: flex;
+            gap: 16px;
+        }
+
+        .col-left {
+            flex: 1.15;
+        }
+
+        .col-right {
+            flex: 1;
+        }
+
+        /* ---- Section Styling ---- */
+        .section {
+            margin-bottom: 11px;
+        }
+
+        .section-title {
+            font-size: 10px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            color: #6366f1;
+            margin-bottom: 5px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .section-title::before {
+            content: '';
+            width: 3px;
+            height: 12px;
+            background: linear-gradient(180deg, #6366f1, #a855f7);
+            border-radius: 2px;
+        }
+
+        .section p {
+            font-size: 9px;
+            line-height: 1.55;
+            color: #374151;
+            text-align: justify;
+        }
+
+        /* ---- Feature Grid ---- */
+        .features-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .feature-card {
+            background: #f3f4f6;
+            border-radius: 6px;
+            padding: 6px 8px;
+            border-left: 2.5px solid #6366f1;
+        }
+
+        .feature-card .feature-title {
+            font-size: 8.5px;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 2px;
+        }
+
+        .feature-card .feature-desc {
+            font-size: 7.5px;
+            color: #6b7280;
+            line-height: 1.4;
+        }
+
+        /* ---- Architecture Diagram ---- */
+        .arch-box {
+            background: #1a1a2e;
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 11px;
+            font-family: 'Courier New', monospace;
+            font-size: 7.5px;
+            color: #a5b4fc;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        .arch-layer {
+            background: rgba(99, 102, 241, 0.15);
+            border: 1px solid rgba(99, 102, 241, 0.3);
+            border-radius: 4px;
+            padding: 3px 0;
+            margin-bottom: 3px;
+            color: #c7d2fe;
+            font-size: 7.5px;
+            font-weight: 600;
+        }
+
+        .arch-layer:last-child {
+            margin-bottom: 0;
+        }
+
+        .arch-arrow {
+            color: #6366f1;
+            font-size: 8px;
+            margin: 1px 0;
+        }
+
+        /* ---- Benchmark Table ---- */
+        .bench-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 8px;
+            margin-top: 4px;
+        }
+
+        .bench-table th {
+            background: linear-gradient(135deg, #6366f1, #8b5cf6);
+            color: #fff;
+            padding: 4px 6px;
+            text-align: left;
+            font-weight: 700;
+            font-size: 7.5px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .bench-table th:first-child {
+            border-radius: 4px 0 0 0;
+        }
+
+        .bench-table th:last-child {
+            border-radius: 0 4px 0 0;
+        }
+
+        .bench-table td {
+            padding: 3.5px 6px;
+            border-bottom: 1px solid #e5e7eb;
+            font-size: 8px;
+            color: #374151;
+        }
+
+        .bench-table tr:nth-child(even) td {
+            background: #f9fafb;
+        }
+
+        .highlight-cell {
+            color: #059669 !important;
+            font-weight: 700;
+        }
+
+        /* ---- Tech Stack Badges ---- */
+        .tech-stack {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin-top: 4px;
+        }
+
+        .tech-badge {
+            display: inline-block;
+            background: #eef2ff;
+            color: #4f46e5;
+            font-size: 7.5px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 10px;
+            border: 1px solid #c7d2fe;
+        }
+
+        /* ---- Footer ---- */
+        .footer {
+            position: absolute;
+            bottom: 10mm;
+            left: 20mm;
+            right: 20mm;
+            text-align: center;
+            font-size: 7.5px;
+            color: #9ca3af;
+            border-top: 1px solid #e5e7eb;
+            padding-top: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+
+        <!-- Header -->
+        <div class="header">
+            <div class="university-name">COMSATS University Islamabad, Abbottabad Campus</div>
+            <div class="dept-name">Department of Computer Science — Operating Systems</div>
+            <div class="project-badge">OS Semester Project — Spring 2026</div>
+            <div class="project-title">UThread: A User-Space Thread Scheduling Engine</div>
+            <div class="project-subtitle">High-Performance M:N Green Thread Runtime with Work Stealing, Async I/O & Preemptive Scheduling in C</div>
+        </div>
+
+        <!-- Team -->
+        <div class="team-section">
+            <div class="team-member">
+                <div class="name">Muhammad Atif</div>
+                <div class="roll">FA24-BSE-011</div>
+            </div>
+            <div class="team-member">
+                <div class="name">Syed Muhammad Haziq</div>
+                <div class="roll">FA24-BSE-031</div>
+            </div>
+            <div class="team-member">
+                <div class="name">Abdur Rehman</div>
+                <div class="roll">FA24-BSE-001</div>
+            </div>
+        </div>
+
+        <!-- Two-Column Content -->
+        <div class="content">
+
+            <!-- LEFT COLUMN -->
+            <div class="col-left">
+
+                <div class="section">
+                    <div class="section-title">Project Overview</div>
+                    <p>
+                        <b>UThread</b> is a production-grade, user-space thread scheduling library written entirely in C. Modern high-concurrency systems — such as Go's Goroutine scheduler and Java's Project Loom — rely on green threads and M:N threading models to achieve massive scalability far beyond what the OS kernel can provide natively. UThread was designed and built from scratch to replicate, explore, and benchmark these real-world concurrency mechanisms. The library manages thread context switching entirely in user-space using the POSIX <code>ucontext_t</code> API, achieving <b>sub-microsecond context switch latencies</b> — approximately <b>7.75× faster</b> than native Linux <code>pthreads</code> — and can spawn and schedule <b>15,000+ concurrent threads</b> in a fraction of a second. The project evolved through 14 development phases, from a basic cooperative 1:N scheduler into a fully featured M:N work-stealing engine with preemptive scheduling, synchronization primitives, asynchronous I/O, memory-safe guard pages, and interactive execution tracing.
+                    </p>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Core Features</div>
+                    <div class="features-grid">
+                        <div class="feature-card">
+                            <div class="feature-title">⚡ M:N Work Stealing</div>
+                            <div class="feature-desc">Maps thousands of user threads across multiple Virtual Processors (CPU cores). Idle cores proactively steal work from overloaded cores for automatic load balancing.</div>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-title">🔄 Preemptive Scheduling</div>
+                            <div class="feature-desc">SIGALRM-based timer interrupts force context switches every 10ms. Supports pluggable Round-Robin and Priority scheduling policies.</div>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-title">🔒 Synchronization Primitives</div>
+                            <div class="feature-desc">Mutexes, Counting Semaphores, and Buffered Channels built on scheduler-level blocking — no busy-waiting or spinlocks for user code.</div>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-title">🌐 Async I/O (epoll)</div>
+                            <div class="feature-desc">Non-blocking sleep, read & write APIs via Linux epoll. I/O-bound threads yield automatically; the CPU never sits idle.</div>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-title">🛡️ Guard Page Protection</div>
+                            <div class="feature-desc">Stacks allocated via mmap with mprotect guard pages. Custom SIGSEGV handler safely detects and reports stack overflows.</div>
+                        </div>
+                        <div class="feature-card">
+                            <div class="feature-title">📊 Execution Tracing</div>
+                            <div class="feature-desc">Ring buffer records all context switches, steals & I/O events. Exports Chrome Trace JSON for interactive Gantt chart visualization.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="section">
+                    <div class="section-title">Technologies & Tools</div>
+                    <div class="tech-stack">
+                        <span class="tech-badge">C11</span>
+                        <span class="tech-badge">ucontext.h</span>
+                        <span class="tech-badge">pthreads</span>
+                        <span class="tech-badge">epoll</span>
+                        <span class="tech-badge">mmap / mprotect</span>
+                        <span class="tech-badge">SIGALRM</span>
+                        <span class="tech-badge">Atomic Ops</span>
+                        <span class="tech-badge">GCC</span>
+                        <span class="tech-badge">Make</span>
+                        <span class="tech-badge">Linux / WSL</span>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN -->
+            <div class="col-right">
+
+                <!-- Architecture -->
+                <div class="section">
+                    <div class="section-title">Architecture</div>
+                    <div class="arch-box">
+                        <div class="arch-layer">Demo Apps &amp; Test Suite (13 Tests, 3 Benchmarks)</div>
+                        <div class="arch-arrow">▼</div>
+                        <div class="arch-layer">High-Level APIs — Mutex · Semaphore · Channel</div>
+                        <div class="arch-arrow">▼</div>
+                        <div class="arch-layer">M:N Work-Stealing Scheduler · Spinlocks · Async I/O</div>
+                        <div class="arch-arrow">▼</div>
+                        <div class="arch-layer">Context Engine — ucontext · Guard Pages · Tracing</div>
+                        <div class="arch-arrow">▼</div>
+                        <div class="arch-layer" style="border-color: rgba(236,72,153,0.4); background: rgba(236,72,153,0.1);">OS Kernel — Native pthreads backing Virtual Processors</div>
+                    </div>
+                </div>
+
+                <!-- Benchmarks -->
+                <div class="section">
+                    <div class="section-title">Benchmark Results</div>
+                    <table class="bench-table">
+                        <thead>
+                            <tr>
+                                <th>Benchmark</th>
+                                <th>UThread</th>
+                                <th>pthreads</th>
+                                <th>Speedup</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Context Switch (100K)</td>
+                                <td class="highlight-cell">0.59s</td>
+                                <td>4.58s</td>
+                                <td class="highlight-cell">7.75×</td>
+                            </tr>
+                            <tr>
+                                <td>Spawn 1K Threads</td>
+                                <td class="highlight-cell">0.015s</td>
+                                <td>0.241s</td>
+                                <td class="highlight-cell">16.35×</td>
+                            </tr>
+                            <tr>
+                                <td>M:N 4-VP vs 1:N</td>
+                                <td class="highlight-cell">0.067s</td>
+                                <td>0.147s</td>
+                                <td class="highlight-cell">2.20×</td>
+                            </tr>
+                            <tr>
+                                <td>15K Concurrent Threads</td>
+                                <td class="highlight-cell">&lt; 0.1s</td>
+                                <td>Several sec</td>
+                                <td class="highlight-cell">~15×</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <p style="font-size: 7.5px; color: #9ca3af; margin-top: 3px;">Context switch latency: ~1.85 μs/switch. Benchmarks on Linux x86-64.</p>
+                </div>
+
+                <!-- Key Design Decisions -->
+                <div class="section">
+                    <div class="section-title">Key Design Decisions</div>
+                    <p>
+                        <b>ucontext vs Assembly:</b> We chose POSIX <code>ucontext_t</code> for portable, hardware-agnostic context switching over inline assembly, trading a small performance overhead for full cross-platform safety.
+                    </p>
+                    <p style="margin-top: 3px;">
+                        <b>Scheduler-Level Blocking:</b> Mutexes use scheduler-managed state transitions (RUNNING → BLOCKED → READY) via <code>swapcontext</code> instead of Peterson's-style busy-waiting, which we proved fails on modern CPUs due to memory reordering.
+                    </p>
+                    <p style="margin-top: 3px;">
+                        <b>Dynamic TCB Allocation:</b> Threads are dynamically allocated via intrusive linked-lists with O(1) garbage collection, removing all hardcoded limits and enabling infinite thread creation.
+                    </p>
+                </div>
+
+                <!-- Codebase Stats -->
+                <div class="section">
+                    <div class="section-title">Codebase Statistics</div>
+                    <p>
+                        <b>~1,200</b> lines of core scheduler code (uthread.c) &nbsp;|&nbsp;
+                        <b>150</b> lines of public API header &nbsp;|&nbsp;
+                        <b>13</b> test programs &nbsp;|&nbsp;
+                        <b>3</b> benchmark suites &nbsp;|&nbsp;
+                        <b>1</b> interactive Gantt Chart visualization tool
+                    </p>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            UThread: A User-Space Thread Scheduling Engine &nbsp;•&nbsp; OS Semester Project &nbsp;•&nbsp; Muhammad Atif (FA24-BSE-011) &nbsp;•&nbsp; Syed Muhammad Haziq (FA24-BSE-031) &nbsp;•&nbsp; Abdur Rehman (FA24-BSE-001)
+        </div>
+    </div>
+</body>
+</html>
